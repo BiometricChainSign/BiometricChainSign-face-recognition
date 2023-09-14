@@ -133,7 +133,7 @@ class TestSuite:
 
         self.recognizer.training_data_setup(training_data_path)
         self.recognizer.train()
-        self.recognizer.load_model('./classifierFisherface.xml')
+        self.recognizer.load_model()
 
         self.true_labels: List[int | None] = []
         self.predicted_labels: List[int | None] = []
@@ -185,9 +185,10 @@ if __name__ == '__main__':
     )
     disp.plot()
 
-    plt.xticks(rotation=45)
-    plt.title('Confusion Matrix')
+    plt.title('Matriz de confusão');plt.xticks(rotation=45)
+    plt.xlabel(xlabel='Rótulos previstos');plt.ylabel(ylabel='Rótulos verdadeiros')
+    
     mng = plt.get_current_fig_manager()
     mng.set_window_title(
-        'BiometricChainSign Face Recognition Confusion Matrix')
+        'BiometricChainSign')
     plt.show()
