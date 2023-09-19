@@ -2,7 +2,11 @@ import cv2
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import (
+    classification_report,
+    confusion_matrix,
+    ConfusionMatrixDisplay,
+)
 from typing import List
 
 from fisherface import FisherfaceFaceRecognizer
@@ -19,7 +23,7 @@ class TestData:
         label: int,
         test_image: cv2.typing.MatLike,
         true_image: cv2.typing.MatLike,
-        path: str = None
+        path: str = None,
     ) -> None:
         self.label = label
         self.test_image = test_image
@@ -40,7 +44,7 @@ class TestOutput:
         result_value: int,
         test_image: cv2.typing.MatLike,
         true_image: cv2.typing.MatLike,
-        face_matched: bool
+        face_matched: bool,
     ) -> None:
         self.expected_value = expected_value
         self.result_value = result_value
@@ -67,31 +71,35 @@ class TestSuite:
 
     def plot_gallery(self, n_row=3, n_col=4):
         if not self.tested:
-            raise ValueError('The test must be executed before plotting the image.')
+            raise ValueError("The test must be executed before plotting the image.")
 
         plt.figure(figsize=(1.8 * n_col, 2.4 * n_row))
-        plt.subplots_adjust(bottom=0, left=0.01,
-                            right=0.99, top=0.90, hspace=0.35)
+        plt.subplots_adjust(bottom=0, left=0.01, right=0.99, top=0.90, hspace=0.35)
         i = 0
         NUM_IMAGES_TO_DISPLAY = 12
 
         white_separator = np.full(
-            (self.test_output[0].test_image.shape[0], 10, 3), 255, dtype=np.uint8)
+            (self.test_output[0].test_image.shape[0], 10, 3), 255, dtype=np.uint8
+        )
 
-        for test in self.test_output[0: NUM_IMAGES_TO_DISPLAY]:
+        for test in self.test_output[0:NUM_IMAGES_TO_DISPLAY]:
             plt.subplot(n_row, n_col, i + 1)
 
             plt.imshow(
                 np.concatenate(
-                    (test.test_image,  white_separator, test.true_image), axis=1)
+                    (test.test_image, white_separator, test.true_image), axis=1
+                )
             )
             plt.title(
-                f'imagem de teste               imagem resultante\nclasse: {test.expected_value}                             classe: {test.result_value}', size=10)
+                f"imagem de teste               imagem resultante\nclasse: {test.expected_value}                             classe: {test.result_value}",
+                size=10,
+            )
             plt.xticks(())
             plt.yticks(())
             i += 1
         plt.get_current_fig_manager().set_window_title(
-            'BiometricChainSign Face Recognition Test')
+            "BiometricChainSign Face Recognition Test"
+        )
 
     def __test_data_setup(self, test_data_path: str, training_data_path: str) -> None:
         self.test_data = []
@@ -99,18 +107,19 @@ class TestSuite:
         for dir in os.listdir(test_data_path):
             label = None
 
-            if (dir[0] != 's'):
+            if dir[0] != "s":
                 label = 0
             else:
-                label = int(dir.split('s')[1])
+                label = int(dir.split("s")[1])
 
             for pathImage in os.listdir(os.path.join(test_data_path, dir)):
                 imagePath = os.path.join(test_data_path, dir, pathImage)
                 test_image = cv2.imread(imagePath)
                 true_image = cv2.imread(
                     os.path.join(
-                        training_data_path, dir, os.listdir(
-                            os.path.join(training_data_path, dir))[0]
+                        training_data_path,
+                        dir,
+                        os.listdir(os.path.join(training_data_path, dir))[0],
                     )
                 )
 
@@ -119,7 +128,7 @@ class TestSuite:
                         label=label,
                         test_image=test_image,
                         true_image=true_image,
-                        path=imagePath
+                        path=imagePath,
                     )
                 )
 
@@ -127,8 +136,7 @@ class TestSuite:
 
     def run_test(self, test_data_path: str, training_data_path: str) -> List[bool]:
         self.__test_data_setup(
-            test_data_path=test_data_path,
-            training_data_path=training_data_path
+            test_data_path=test_data_path, training_data_path=training_data_path
         )
 
         self.recognizer.training_data_setup(training_data_path)
@@ -139,9 +147,7 @@ class TestSuite:
         self.predicted_labels: List[int | None] = []
 
         for test in self.test_data:
-            label, confidence = self.recognizer.predict(
-                test_image=test.test_image
-            )
+            label, confidence = self.recognizer.predict(test_image=test.test_image)
 
             label = label if label is not None else 0
 
@@ -158,7 +164,7 @@ class TestSuite:
                     result_value=label,
                     test_image=test.test_image,
                     true_image=test.true_image,
-                    face_matched=test.label == label
+                    face_matched=test.label == label,
                 )
             )
 
@@ -167,11 +173,11 @@ class TestSuite:
         return list(map(lambda x: x.face_matched, self.test_output))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test_suite = TestSuite()
     test_result = test_suite.run_test(
-        test_data_path='dataset/AT&T Database of Faces/test-data',
-        training_data_path='dataset/AT&T Database of Faces/training-data'
+        test_data_path="dataset/AT&T Database of Faces/test-data",
+        training_data_path="dataset/AT&T Database of Faces/training-data",
     )
 
     test_suite.plot_gallery()
@@ -181,14 +187,15 @@ if __name__ == '__main__':
     cm = confusion_matrix(test_suite.true_labels, test_suite.predicted_labels)
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm,
-        display_labels=np.arange(start=1, stop=len(test_result) + 1)
+        display_labels=np.arange(start=1, stop=len(test_result) + 1),
     )
     disp.plot()
 
-    plt.title('Matriz de confusão');plt.xticks(rotation=45)
-    plt.xlabel(xlabel='Rótulos previstos');plt.ylabel(ylabel='Rótulos verdadeiros')
-    
+    plt.title("Matriz de confusão")
+    plt.xticks(rotation=45)
+    plt.xlabel(xlabel="Rótulos previstos")
+    plt.ylabel(ylabel="Rótulos verdadeiros")
+
     mng = plt.get_current_fig_manager()
-    mng.set_window_title(
-        'BiometricChainSign')
+    mng.set_window_title("BiometricChainSign")
     plt.show()
