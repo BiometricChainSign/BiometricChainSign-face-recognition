@@ -2,6 +2,7 @@ import cv2
 import os
 from sys import argv
 
+import re
 import json
 from enum import Enum
 from typing import List, TypedDict
@@ -10,9 +11,15 @@ import numpy as np
 import cv2.typing
 
 BASE_PATH = __file__.removesuffix("fisherface.py")
+DEFAULT_MODEL_FILE = os.path.join(BASE_PATH, "classifierFisherface.xml")
+DEFAULT_TRAINING_DATA = os.path.join(
+    BASE_PATH, "dataset", "AT&T Database of Faces", "training-data"
+)
 
-DEFAULT_MODEL_FILE = f"{BASE_PATH}classifierFisherface.xml"
-DEFAULT_TRAINING_DATA = f"{BASE_PATH}dataset/AT&T Database of Faces/training-data"
+
+def debug_img(img: cv2.typing.MatLike):
+    cv2.imshow("DEBUG", img)
+    cv2.waitKey(0)
 
 
 class Model:
@@ -39,8 +46,9 @@ class FisherfaceFaceRecognizer:
     def __init__(self) -> None:
         self.model = cv2.face.FisherFaceRecognizer_create()
         self.cascade_classifier = cv2.CascadeClassifier(
-            f"{BASE_PATH}haarcascade_frontalface_default.xml"
+            os.path.join(BASE_PATH, "haarcascade_frontalface_default.xml")
         )
+
         self.faces = []
         self.labels = []
         self.trained = False
@@ -79,6 +87,9 @@ class FisherfaceFaceRecognizer:
 
         label = None
         for dir in os.listdir(training_data_path):
+            if dir.startswith("."):
+                continue
+
             if default_label is not None:
                 label = default_label
             else:
@@ -86,6 +97,8 @@ class FisherfaceFaceRecognizer:
                 label = int(label[1] if len(label) >= 1 else label[0])
 
             for pathImage in os.listdir(os.path.join(training_data_path, dir)):
+                if dir.startswith("."):
+                    continue
                 imagePath = os.path.join(training_data_path, dir, pathImage)
                 image = cv2.imread(imagePath)
                 detected_face = self.detect_and_resize_face(image)
@@ -96,9 +109,10 @@ class FisherfaceFaceRecognizer:
 
                 """DEBUG"""
                 # if detected_face is None:
-                #     print(f'label: {dir}, image: {pathImage}')
+                #     print(f"label: {dir}, image: {pathImage}")
 
-        if old_len_faces == len(self.faces):
+        if old_len_faces == len(self.faces) or len(self.faces) <= (old_len_faces + 7):
+            print(old_len_faces, len(self.faces))
             raise ValueError("No new classes have been added.")
 
     def train(self, file_name: str = None) -> None:
@@ -119,9 +133,10 @@ class FisherfaceFaceRecognizer:
                 "The model has not been trained yet. Please train the model first."
             )
 
-        face = self.detect_and_resize_face(test_image)
-        if face is not None:
-            label, confidence = self.model.predict(face)
+        detected_face = self.detect_and_resize_face(test_image)
+
+        if detected_face is not None:
+            label, confidence = self.model.predict(detected_face)
             if confidence < 270:
                 return label, confidence
             else:
@@ -132,15 +147,13 @@ class FisherfaceFaceRecognizer:
     def add_class(
         self,
         model_file=DEFAULT_MODEL_FILE,
-        new_class_path: str = "dataset/new_class",
+        new_class_path: str = os.path.join(BASE_PATH, "dataset", "new_class"),
         label=0,
     ) -> bool:
         """This function is designed to be called by Electron"""
 
         self.training_data_setup()
-        self.training_data_setup(
-            training_data_path=f"{BASE_PATH}{new_class_path}", default_label=label
-        )
+        self.training_data_setup(training_data_path=new_class_path, default_label=label)
         self.train(file_name=model_file)
         return True
 
@@ -156,14 +169,36 @@ class Args(TypedDict):
 
 
 if __name__ == "__main__":
-    args: Args = json.loads(argv[1])
     recognizer = FisherfaceFaceRecognizer()
+    recognizer.training_data_setup()
+    recognizer.train()
+    recognizer.load_model()
+    recognizer.predict(cv2.imread("dataset/test.pgm"))
 
-    if args["action"] == Action.ADD_CLASS.value:
-        recognizer.add_class(
-            model_file=f"{BASE_PATH}{args['data']['modelFile']}",
-            new_class_path=args["data"]["classPath"],
-        )
-        print(json.dumps({"result": True}))
-    elif args["action"] == Action.TEST_IMG.value:
-        pass
+    # args: Args = json.loads(argv[1])
+
+    # if args["action"] == Action.ADD_CLASS.value:
+    #     recognizer.add_class(
+    #         model_file=os.path.join(
+    #             BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"])
+    #         ),
+    #         new_class_path=os.path.join(
+    #             BASE_PATH, *re.split(r"[\\/]", args["data"]["classPath"])
+    #         ),
+    #     )
+
+    #     print(json.dumps({"result": True}))
+    # elif args["action"] == Action.TEST_IMG.value:
+    #     recognizer.load_model(
+    #         os.path.join(BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
+    #     )
+
+    #     label, confidence = recognizer.predict(
+    #         cv2.imread(
+    #             os.path.join(
+    #                 BASE_PATH, *re.split(r"[\\/]", args["data"]["testImagePath"])
+    #             )
+    #         )
+    #     )
+
+    #     print({"label": label, "confidence": confidence})
