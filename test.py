@@ -1,13 +1,17 @@
-import cv2
 import os
+import cv2
+
 import numpy as np
+
 import matplotlib.pyplot as plt
 from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     ConfusionMatrixDisplay,
 )
+
 from typing import List
+import cv2.typing
 
 from fisherface import FisherfaceFaceRecognizer
 
@@ -105,6 +109,9 @@ class TestSuite:
         self.test_data = []
 
         for dir in os.listdir(test_data_path):
+            if dir.startswith("."):
+                continue
+    
             label = None
 
             if dir[0] != "s":
@@ -113,6 +120,8 @@ class TestSuite:
                 label = int(dir.split("s")[1])
 
             for pathImage in os.listdir(os.path.join(test_data_path, dir)):
+                if pathImage.startswith("."):
+                    continue
                 imagePath = os.path.join(test_data_path, dir, pathImage)
                 test_image = cv2.imread(imagePath)
                 true_image = cv2.imread(
@@ -187,7 +196,7 @@ if __name__ == "__main__":
     cm = confusion_matrix(test_suite.true_labels, test_suite.predicted_labels)
     disp = ConfusionMatrixDisplay(
         confusion_matrix=cm,
-        display_labels=np.arange(start=1, stop=len(test_result) + 1),
+        # display_labels=np.arange(start=1, stop=len(test_result) + 1),
     )
     disp.plot()
 

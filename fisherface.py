@@ -1,13 +1,14 @@
-import cv2
 import os
 from sys import argv
 
-import re
 import json
+import re
 from enum import Enum
-from typing import List, TypedDict
 
+import cv2
 import numpy as np
+
+from typing import List, TypedDict
 import cv2.typing
 
 BASE_PATH = __file__.removesuffix("fisherface.py")
@@ -20,6 +21,7 @@ DEFAULT_TRAINING_DATA = os.path.join(
 def debug_img(img: cv2.typing.MatLike):
     cv2.imshow("DEBUG", img)
     cv2.waitKey(0)
+    cv2.destroyAllWindows()
 
 
 class Model:
@@ -61,21 +63,23 @@ class FisherfaceFaceRecognizer:
         self.model.read(path if path is not None else DEFAULT_MODEL_FILE)
         self.trained = True
 
-    def detect_and_resize_face(
+    def preprocess_image(
         self, image: cv2.typing.MatLike
     ) -> cv2.typing.MatLike | None:
-        resized_width, resized_height = (50, 38)
+        resized_width, resized_height = (25, 25)
         gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
         detected_faces = self.cascade_classifier.detectMultiScale(
-            gray_image, scaleFactor=1.01, minNeighbors=4, minSize=(30, 30)
+            gray_image, scaleFactor=1.2, minNeighbors=3, minSize=(25, 25)
         )
 
         if len(detected_faces) == 0:
+            """DEBUG"""
+            # debug_img(gray_image)
             return None
 
         x, y, w, h = detected_faces[0]
-        face_roi = gray_image[y : y + h, x : x + w]
+        face_roi = gray_image[y: y + h, x: x + w]
         resized_face = cv2.resize(face_roi, (resized_width, resized_height))
 
         return resized_face
@@ -97,11 +101,11 @@ class FisherfaceFaceRecognizer:
                 label = int(label[1] if len(label) >= 1 else label[0])
 
             for pathImage in os.listdir(os.path.join(training_data_path, dir)):
-                if dir.startswith("."):
+                if pathImage.startswith("."):
                     continue
                 imagePath = os.path.join(training_data_path, dir, pathImage)
                 image = cv2.imread(imagePath)
-                detected_face = self.detect_and_resize_face(image)
+                detected_face = self.preprocess_image(image)
 
                 if detected_face is not None:
                     self.faces.append(detected_face)
@@ -112,7 +116,6 @@ class FisherfaceFaceRecognizer:
                 #     print(f"label: {dir}, image: {pathImage}")
 
         if old_len_faces == len(self.faces) or len(self.faces) <= (old_len_faces + 7):
-            print(old_len_faces, len(self.faces))
             raise ValueError("No new classes have been added.")
 
     def train(self, file_name: str = None) -> None:
@@ -122,7 +125,8 @@ class FisherfaceFaceRecognizer:
             )
 
         self.model.train(self.faces, np.array(self.labels))
-        self.model.write(file_name if file_name is not None else DEFAULT_MODEL_FILE)
+        self.model.write(
+            file_name if file_name is not None else DEFAULT_MODEL_FILE)
         self.trained = True
 
     def predict(
@@ -133,11 +137,11 @@ class FisherfaceFaceRecognizer:
                 "The model has not been trained yet. Please train the model first."
             )
 
-        detected_face = self.detect_and_resize_face(test_image)
+        detected_face = self.preprocess_image(test_image)
 
         if detected_face is not None:
             label, confidence = self.model.predict(detected_face)
-            if confidence < 270:
+            if confidence < 220:
                 return label, confidence
             else:
                 return None, None
@@ -153,7 +157,8 @@ class FisherfaceFaceRecognizer:
         """This function is designed to be called by Electron"""
 
         self.training_data_setup()
-        self.training_data_setup(training_data_path=new_class_path, default_label=label)
+        self.training_data_setup(
+            training_data_path=new_class_path, default_label=label)
         self.train(file_name=model_file)
         return True
 
@@ -169,36 +174,33 @@ class Args(TypedDict):
 
 
 if __name__ == "__main__":
+    args: Args = json.loads(argv[1])
     recognizer = FisherfaceFaceRecognizer()
-    recognizer.training_data_setup()
-    recognizer.train()
-    recognizer.load_model()
-    recognizer.predict(cv2.imread("dataset/test.pgm"))
 
-    # args: Args = json.loads(argv[1])
+    if args["action"] == Action.ADD_CLASS.value:
+        recognizer.add_class(
+            model_file=os.path.join(
+                BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"])
+            ),
+            new_class_path=os.path.join(
+                BASE_PATH, *re.split(r"[\\/]", args["data"]["classPath"])
+            ),
+        )
 
-    # if args["action"] == Action.ADD_CLASS.value:
-    #     recognizer.add_class(
-    #         model_file=os.path.join(
-    #             BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"])
-    #         ),
-    #         new_class_path=os.path.join(
-    #             BASE_PATH, *re.split(r"[\\/]", args["data"]["classPath"])
-    #         ),
-    #     )
+        print(json.dumps({"result": True}))
+    elif args["action"] == Action.TEST_IMG.value:
+        recognizer.load_model(
+            os.path.join(
+                BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
+        )
 
-    #     print(json.dumps({"result": True}))
-    # elif args["action"] == Action.TEST_IMG.value:
-    #     recognizer.load_model(
-    #         os.path.join(BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
-    #     )
+        label, confidence = recognizer.predict(
+            cv2.imread(
+                os.path.join(
+                    BASE_PATH, *
+                    re.split(r"[\\/]", args["data"]["testImagePath"])
+                )
+            )
+        )
 
-    #     label, confidence = recognizer.predict(
-    #         cv2.imread(
-    #             os.path.join(
-    #                 BASE_PATH, *re.split(r"[\\/]", args["data"]["testImagePath"])
-    #             )
-    #         )
-    #     )
-
-    #     print({"label": label, "confidence": confidence})
+        print({"label": label, "confidence": confidence})

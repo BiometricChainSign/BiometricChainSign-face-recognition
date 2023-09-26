@@ -1,5 +1,4 @@
 __pycache__
-classifierFisherface.xml
 *.xml
 !haarcascade_frontalface_default.xml
 dataset/*.*
