@@ -1,5 +1,5 @@
 import os
-from sys import argv
+import sys
 
 import json
 import re
@@ -11,7 +11,13 @@ import numpy as np
 from typing import List, TypedDict
 import cv2.typing
 
-BASE_PATH = __file__.removesuffix("fisherface.py")
+BASE_PATH: str = None
+
+if getattr(sys, "frozen", False):
+    BASE_PATH = os.path.dirname(sys.executable)
+elif __file__:
+    BASE_PATH = os.path.dirname(__file__)
+
 DEFAULT_MODEL_FILE = os.path.join(BASE_PATH, "classifierFisherface.xml")
 DEFAULT_TRAINING_DATA = os.path.join(
     BASE_PATH, "dataset", "AT&T Database of Faces", "training-data"
@@ -63,23 +69,23 @@ class FisherfaceFaceRecognizer:
         self.model.read(path if path is not None else DEFAULT_MODEL_FILE)
         self.trained = True
 
-    def preprocess_image(
-        self, image: cv2.typing.MatLike
+    def preprocess_img(
+        self, img: cv2.typing.MatLike
     ) -> cv2.typing.MatLike | None:
-        resized_width, resized_height = (25, 25)
-        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        resized_width, resized_height = (50, 38)
+        gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         detected_faces = self.cascade_classifier.detectMultiScale(
-            gray_image, scaleFactor=1.2, minNeighbors=3, minSize=(25, 25)
+            gray_img, scaleFactor=1.01, minNeighbors=4, minSize=(30, 30)
         )
 
         if len(detected_faces) == 0:
             """DEBUG"""
-            # debug_img(gray_image)
+            # debug_img(gray_img)
             return None
 
         x, y, w, h = detected_faces[0]
-        face_roi = gray_image[y: y + h, x: x + w]
+        face_roi = gray_img[y: y + h, x: x + w]
         resized_face = cv2.resize(face_roi, (resized_width, resized_height))
 
         return resized_face
@@ -100,12 +106,12 @@ class FisherfaceFaceRecognizer:
                 label = dir.split("s")
                 label = int(label[1] if len(label) >= 1 else label[0])
 
-            for pathImage in os.listdir(os.path.join(training_data_path, dir)):
-                if pathImage.startswith("."):
+            for pathImg in os.listdir(os.path.join(training_data_path, dir)):
+                if pathImg.startswith("."):
                     continue
-                imagePath = os.path.join(training_data_path, dir, pathImage)
-                image = cv2.imread(imagePath)
-                detected_face = self.preprocess_image(image)
+                pathImg = os.path.join(training_data_path, dir, pathImg)
+                img = cv2.imread(pathImg)
+                detected_face = self.preprocess_img(img)
 
                 if detected_face is not None:
                     self.faces.append(detected_face)
@@ -113,7 +119,7 @@ class FisherfaceFaceRecognizer:
 
                 """DEBUG"""
                 # if detected_face is None:
-                #     print(f"label: {dir}, image: {pathImage}")
+                #     print(f"label: {dir}, img: {pathImg}")
 
         if old_len_faces == len(self.faces) or len(self.faces) <= (old_len_faces + 7):
             raise ValueError("No new classes have been added.")
@@ -130,18 +136,19 @@ class FisherfaceFaceRecognizer:
         self.trained = True
 
     def predict(
-        self, test_image: cv2.typing.MatLike
+        self, test_img: cv2.typing.MatLike, _confidence: int = None
     ) -> tuple[int, float] | tuple[None, None]:
         if not self.trained:
             raise ValueError(
                 "The model has not been trained yet. Please train the model first."
             )
 
-        detected_face = self.preprocess_image(test_image)
+        detected_face = self.preprocess_img(test_img)
 
         if detected_face is not None:
             label, confidence = self.model.predict(detected_face)
-            if confidence < 220:
+            if confidence < (_confidence if _confidence is not None else 215):
+                print(confidence, _confidence)
                 return label, confidence
             else:
                 return None, None
@@ -174,7 +181,7 @@ class Args(TypedDict):
 
 
 if __name__ == "__main__":
-    args: Args = json.loads(argv[1])
+    args: Args = json.loads(sys.argv[1])
     recognizer = FisherfaceFaceRecognizer()
 
     if args["action"] == Action.ADD_CLASS.value:
@@ -194,13 +201,24 @@ if __name__ == "__main__":
                 BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
         )
 
-        label, confidence = recognizer.predict(
-            cv2.imread(
-                os.path.join(
-                    BASE_PATH, *
-                    re.split(r"[\\/]", args["data"]["testImagePath"])
-                )
-            )
-        )
+        test_result: List[tuple[int, float]] = []
 
-        print({"label": label, "confidence": confidence})
+        for img_path in args["data"]["testImagesPath"]:
+            label, confidence = recognizer.predict(
+                cv2.imread(
+                    os.path.join(
+                        BASE_PATH, *
+                        re.split(r"[\\/]", img_path)
+                    )
+                ),
+                300
+            )
+
+            if label is not None and confidence is not None:
+                test_result.append((label, confidence))
+
+        if len(test_result) > 0:
+            label, confidence = min(test_result, key=lambda x: x[1])
+            print(json.dumps({"label": label, "confidence": confidence}))
+        else:
+            print(json.dumps({"label": None, "confidence": None}))

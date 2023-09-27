@@ -17,43 +17,43 @@ from fisherface import FisherfaceFaceRecognizer
 
 
 class TestData:
-    test_image: cv2.typing.MatLike
-    true_image: cv2.typing.MatLike
+    test_img: cv2.typing.MatLike
+    true_img: cv2.typing.MatLike
     label: int
     path: str
 
     def __init__(
         self,
         label: int,
-        test_image: cv2.typing.MatLike,
-        true_image: cv2.typing.MatLike,
+        test_img: cv2.typing.MatLike,
+        true_img: cv2.typing.MatLike,
         path: str = None,
     ) -> None:
         self.label = label
-        self.test_image = test_image
-        self.true_image = true_image
+        self.test_img = test_img
+        self.true_img = true_img
         self.path = path
 
 
 class TestOutput:
     expected_value: int
     result_value: int
-    test_image: cv2.typing.MatLike
-    true_image_image: cv2.typing.MatLike
+    test_img: cv2.typing.MatLike
+    true_img: cv2.typing.MatLike
     face_matched: bool
 
     def __init__(
         self,
         expected_value: int,
         result_value: int,
-        test_image: cv2.typing.MatLike,
-        true_image: cv2.typing.MatLike,
+        test_img: cv2.typing.MatLike,
+        true_img: cv2.typing.MatLike,
         face_matched: bool,
     ) -> None:
         self.expected_value = expected_value
         self.result_value = result_value
-        self.test_image = test_image
-        self.true_image = true_image
+        self.test_img = test_img
+        self.true_img = true_img
         self.face_matched = face_matched
 
 
@@ -75,15 +75,17 @@ class TestSuite:
 
     def plot_gallery(self, n_row=3, n_col=4):
         if not self.tested:
-            raise ValueError("The test must be executed before plotting the image.")
+            raise ValueError(
+                "The test must be executed before plotting the image.")
 
         plt.figure(figsize=(1.8 * n_col, 2.4 * n_row))
-        plt.subplots_adjust(bottom=0, left=0.01, right=0.99, top=0.90, hspace=0.35)
+        plt.subplots_adjust(bottom=0, left=0.01,
+                            right=0.99, top=0.90, hspace=0.35)
         i = 0
         NUM_IMAGES_TO_DISPLAY = 12
 
         white_separator = np.full(
-            (self.test_output[0].test_image.shape[0], 10, 3), 255, dtype=np.uint8
+            (self.test_output[0].test_img.shape[0], 10, 3), 255, dtype=np.uint8
         )
 
         for test in self.test_output[0:NUM_IMAGES_TO_DISPLAY]:
@@ -91,7 +93,7 @@ class TestSuite:
 
             plt.imshow(
                 np.concatenate(
-                    (test.test_image, white_separator, test.true_image), axis=1
+                    (test.test_img, white_separator, test.true_img), axis=1
                 )
             )
             plt.title(
@@ -111,7 +113,7 @@ class TestSuite:
         for dir in os.listdir(test_data_path):
             if dir.startswith("."):
                 continue
-    
+
             label = None
 
             if dir[0] != "s":
@@ -119,12 +121,12 @@ class TestSuite:
             else:
                 label = int(dir.split("s")[1])
 
-            for pathImage in os.listdir(os.path.join(test_data_path, dir)):
-                if pathImage.startswith("."):
+            for pathImg in os.listdir(os.path.join(test_data_path, dir)):
+                if pathImg.startswith("."):
                     continue
-                imagePath = os.path.join(test_data_path, dir, pathImage)
-                test_image = cv2.imread(imagePath)
-                true_image = cv2.imread(
+                imgPath = os.path.join(test_data_path, dir, pathImg)
+                test_img = cv2.imread(imgPath)
+                true_img = cv2.imread(
                     os.path.join(
                         training_data_path,
                         dir,
@@ -135,9 +137,9 @@ class TestSuite:
                 self.test_data.append(
                     TestData(
                         label=label,
-                        test_image=test_image,
-                        true_image=true_image,
-                        path=imagePath,
+                        test_img=test_img,
+                        true_img=true_img,
+                        path=imgPath,
                     )
                 )
 
@@ -156,7 +158,7 @@ class TestSuite:
         self.predicted_labels: List[int | None] = []
 
         for test in self.test_data:
-            label, confidence = self.recognizer.predict(test_image=test.test_image)
+            label, confidence = self.recognizer.predict(test_img=test.test_img)
 
             label = label if label is not None else 0
 
@@ -171,8 +173,8 @@ class TestSuite:
                 TestOutput(
                     expected_value=test.label,
                     result_value=label,
-                    test_image=test.test_image,
-                    true_image=test.true_image,
+                    test_img=test.test_img,
+                    true_img=test.true_img,
                     face_matched=test.label == label,
                 )
             )
