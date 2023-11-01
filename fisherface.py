@@ -72,11 +72,11 @@ class FisherfaceFaceRecognizer:
     def preprocess_img(
         self, img: cv2.typing.MatLike
     ) -> cv2.typing.MatLike | None:
-        resized_width, resized_height = (50, 38)
+        resized_width, resized_height = (25, 25)
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         detected_faces = self.cascade_classifier.detectMultiScale(
-            gray_img, scaleFactor=1.01, minNeighbors=4, minSize=(30, 30)
+            gray_img, scaleFactor=1.2, minNeighbors=3, minSize=(25, 25)
         )
 
         if len(detected_faces) == 0:
@@ -148,7 +148,6 @@ class FisherfaceFaceRecognizer:
         if detected_face is not None:
             label, confidence = self.model.predict(detected_face)
             if confidence < (_confidence if _confidence is not None else 215):
-                print(confidence, _confidence)
                 return label, confidence
             else:
                 return None, None
@@ -211,7 +210,6 @@ if __name__ == "__main__":
                         re.split(r"[\\/]", img_path)
                     )
                 ),
-                300
             )
 
             if label is not None and confidence is not None:
