@@ -73,6 +73,28 @@ class TestSuite:
         self.test_output = []
         self.tested = False
 
+    def face_not_found(self, image: cv2.typing.MatLike, text: str):
+        if image is None:
+            return None
+
+        blurred_background = cv2.GaussianBlur(image, (15, 15), 0)
+
+        text_color = (255, 0, 0)
+
+        font = cv2.FONT_HERSHEY_COMPLEX
+        font_scale = 0.5
+        font_thickness = 1
+        
+
+        text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
+        text_x = (image.shape[1] - text_size[0]) // 2
+        text_y = (image.shape[0] + text_size[1]) // 2
+
+        image_with_text = np.copy(blurred_background)
+        cv2.putText(image_with_text, text, (text_x, text_y), font, font_scale, text_color, font_thickness, cv2.LINE_AA)
+
+        return image_with_text
+
     def plot_gallery(self, n_row=3, n_col=4):
         if not self.tested:
             raise ValueError(
@@ -83,6 +105,7 @@ class TestSuite:
                             right=0.99, top=0.90, hspace=0.35)
         i = 0
         NUM_IMAGES_TO_DISPLAY = 12
+        
 
         white_separator = np.full(
             (self.test_output[0].test_img.shape[0], 10, 3), 255, dtype=np.uint8
@@ -93,9 +116,10 @@ class TestSuite:
 
             plt.imshow(
                 np.concatenate(
-                    (test.test_img, white_separator, test.true_img), axis=1
+                    (test.test_img, white_separator, (test.true_img if test.face_matched else self.face_not_found(test.true_img, "ERRO"))), axis=1
                 )
             )
+
             plt.title(
                 f"imagem de teste               imagem resultante\nclasse: {test.expected_value}                             classe: {test.result_value}",
                 size=10,
