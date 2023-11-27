@@ -84,39 +84,60 @@ class TestSuite:
         font = cv2.FONT_HERSHEY_COMPLEX
         font_scale = 0.5
         font_thickness = 1
-        
 
         text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
         text_x = (image.shape[1] - text_size[0]) // 2
         text_y = (image.shape[0] + text_size[1]) // 2
 
         image_with_text = np.copy(blurred_background)
-        cv2.putText(image_with_text, text, (text_x, text_y), font, font_scale, text_color, font_thickness, cv2.LINE_AA)
+        cv2.putText(
+            image_with_text,
+            text,
+            (text_x, text_y),
+            font,
+            font_scale,
+            text_color,
+            font_thickness,
+            cv2.LINE_AA,
+        )
 
         return image_with_text
 
     def plot_gallery(self, n_row=3, n_col=4):
         if not self.tested:
-            raise ValueError(
-                "The test must be executed before plotting the image.")
+            raise ValueError("The test must be executed before plotting the image.")
 
         plt.figure(figsize=(1.8 * n_col, 2.4 * n_row))
-        plt.subplots_adjust(bottom=0, left=0.01,
-                            right=0.99, top=0.90, hspace=0.35)
-        i = 0
+        plt.subplots_adjust(bottom=0, left=0.01, right=0.99, top=0.90, hspace=0.35)
         NUM_IMAGES_TO_DISPLAY = 12
-        
 
         white_separator = np.full(
             (self.test_output[0].test_img.shape[0], 10, 3), 255, dtype=np.uint8
         )
 
-        for test in self.test_output[0:NUM_IMAGES_TO_DISPLAY]:
+        i = 0
+        labels_ploted = []
+        for test in self.test_output:
+            if i >= NUM_IMAGES_TO_DISPLAY:
+                break
+
+            if test.expected_value in labels_ploted:
+                continue
+
             plt.subplot(n_row, n_col, i + 1)
 
             plt.imshow(
                 np.concatenate(
-                    (test.test_img, white_separator, (test.true_img if test.face_matched else self.face_not_found(test.true_img, "ERRO"))), axis=1
+                    (
+                        test.test_img,
+                        white_separator,
+                        (
+                            test.true_img
+                            if test.face_matched
+                            else self.face_not_found(test.true_img, "ERRO")
+                        ),
+                    ),
+                    axis=1,
                 )
             )
 
@@ -126,6 +147,8 @@ class TestSuite:
             )
             plt.xticks(())
             plt.yticks(())
+
+            labels_ploted.append(test.expected_value)
             i += 1
         plt.get_current_fig_manager().set_window_title(
             "BiometricChainSign Face Recognition Test"
@@ -142,6 +165,7 @@ class TestSuite:
 
             if dir[0] != "s":
                 label = 0
+                continue
             else:
                 label = int(dir.split("s")[1])
 
@@ -182,9 +206,11 @@ class TestSuite:
         self.predicted_labels: List[int | None] = []
 
         for test in self.test_data:
-            label, confidence = self.recognizer.predict(test_img=test.test_img)
+            label, confidence = self.recognizer.predict(
+                test_img=test.test_img, _confidence=55
+            )
 
-            label = label if label is not None else 0
+            label = label if label is not None else 0  # not recognized
 
             """DEBUG"""
             # if test.label != label:
@@ -211,25 +237,25 @@ class TestSuite:
 if __name__ == "__main__":
     test_suite = TestSuite()
     test_result = test_suite.run_test(
-        test_data_path="dataset/AT&T Database of Faces/test-data",
-        training_data_path="dataset/AT&T Database of Faces/training-data",
+        test_data_path="dataset/AT&T Database of Faces/output/test-data",
+        training_data_path="dataset/AT&T Database of Faces/output/training-data",
     )
 
     test_suite.plot_gallery()
 
     print(classification_report(test_suite.true_labels, test_suite.predicted_labels))
 
-    cm = confusion_matrix(test_suite.true_labels, test_suite.predicted_labels)
-    disp = ConfusionMatrixDisplay(
-        confusion_matrix=cm,
-        # display_labels=np.arange(start=1, stop=len(test_result) + 1),
-    )
-    disp.plot()
+    # cm = confusion_matrix(test_suite.true_labels, test_suite.predicted_labels)
+    # disp = ConfusionMatrixDisplay(
+    #     confusion_matrix=cm,
+    #     # display_labels=np.arange(start=1, stop=len(test_result) + 1),
+    # )
+    # disp.plot()
 
-    plt.title("Matriz de confusão")
-    plt.xticks(rotation=45)
-    plt.xlabel(xlabel="Rótulos previstos")
-    plt.ylabel(ylabel="Rótulos verdadeiros")
+    # plt.title("Matriz de confusão")
+    # plt.xticks(rotation=45)
+    # plt.xlabel(xlabel="Rótulos previstos")
+    # plt.ylabel(ylabel="Rótulos verdadeiros")
 
     mng = plt.get_current_fig_manager()
     mng.set_window_title("BiometricChainSign")
