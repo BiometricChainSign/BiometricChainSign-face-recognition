@@ -11,6 +11,8 @@ import numpy as np
 from typing import List, TypedDict
 import cv2.typing
 
+from cascade_classifier import CascadeClassifier
+
 BASE_PATH: str = None
 
 if getattr(sys, "frozen", False):
@@ -46,16 +48,15 @@ class Model:
 
 class FisherfaceFaceRecognizer:
     model: Model
-    cascade_classifier: cv2.CascadeClassifier
+    cascade_classifier: CascadeClassifier
+
     faces: List[cv2.typing.MatLike]
     labels: List[int]
     trained: bool
 
     def __init__(self) -> None:
         self.model = cv2.face.FisherFaceRecognizer_create()
-        self.cascade_classifier = cv2.CascadeClassifier(
-            os.path.join(BASE_PATH, "haarcascade_frontalface_default.xml")
-        )
+        self.cascade_classifier = CascadeClassifier()
 
         self.faces = []
         self.labels = []
@@ -70,24 +71,25 @@ class FisherfaceFaceRecognizer:
         self.trained = True
 
     def preprocess_img(
-        self, img: cv2.typing.MatLike
+        self, img: cv2.typing.MatLike, detect_face: bool = False
     ) -> cv2.typing.MatLike | None:
-        resized_width, resized_height = (25, 25)
+        size = (25, 25)
         gray_img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-        detected_faces = self.cascade_classifier.detectMultiScale(
-            gray_img, scaleFactor=1.2, minNeighbors=3, minSize=(25, 25)
-        )
+        if not detect_face:
+            return cv2.resize(gray_img, size)
 
-        if len(detected_faces) == 0:
+        detected_face = self.cascade_classifier.detect_face(img=gray_img, size=size)
+
+        if detected_face is None:
             """DEBUG"""
             # debug_img(gray_img)
             return None
 
-        x, y, w, h = detected_faces[0]
-        face_roi = gray_img[y: y + h, x: x + w]
-        resized_face = cv2.resize(face_roi, (resized_width, resized_height))
+        x, y, w, h = detected_face
+        face_roi = gray_img[y : y + h, x : x + w]
 
+        resized_face = cv2.resize(face_roi, size)
         return resized_face
 
     def training_data_setup(
@@ -131,8 +133,7 @@ class FisherfaceFaceRecognizer:
             )
 
         self.model.train(self.faces, np.array(self.labels))
-        self.model.write(
-            file_name if file_name is not None else DEFAULT_MODEL_FILE)
+        self.model.write(file_name if file_name is not None else DEFAULT_MODEL_FILE)
         self.trained = True
 
     def predict(
@@ -163,8 +164,7 @@ class FisherfaceFaceRecognizer:
         """This function is designed to be called by Electron"""
 
         self.training_data_setup()
-        self.training_data_setup(
-            training_data_path=new_class_path, default_label=label)
+        self.training_data_setup(training_data_path=new_class_path, default_label=label)
         self.train(file_name=model_file)
         return True
 
@@ -196,20 +196,14 @@ if __name__ == "__main__":
         print(json.dumps({"result": True}))
     elif args["action"] == Action.TEST_IMG.value:
         recognizer.load_model(
-            os.path.join(
-                BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
+            os.path.join(BASE_PATH, *re.split(r"[\\/]", args["data"]["modelFile"]))
         )
 
         test_result: List[tuple[int, float]] = []
 
         for img_path in args["data"]["testImagesPath"]:
             label, confidence = recognizer.predict(
-                cv2.imread(
-                    os.path.join(
-                        BASE_PATH, *
-                        re.split(r"[\\/]", img_path)
-                    )
-                ),
+                cv2.imread(os.path.join(BASE_PATH, *re.split(r"[\\/]", img_path))),
             )
 
             if label is not None and confidence is not None:

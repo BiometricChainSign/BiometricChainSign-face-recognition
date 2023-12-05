@@ -77,13 +77,13 @@ class TestSuite:
         if image is None:
             return None
 
-        blurred_background = cv2.GaussianBlur(image, (15, 15), 0)
+        blurred_background = cv2.GaussianBlur(image[:, :, ::-1], (25, 25), 0)
 
         text_color = (255, 0, 0)
 
         font = cv2.FONT_HERSHEY_COMPLEX
-        font_scale = 0.5
-        font_thickness = 1
+        font_scale = 2
+        font_thickness = 2
 
         text_size = cv2.getTextSize(text, font, font_scale, font_thickness)[0]
         text_x = (image.shape[1] - text_size[0]) // 2
@@ -103,13 +103,13 @@ class TestSuite:
 
         return image_with_text
 
-    def plot_gallery(self, n_row=3, n_col=4):
+    def plot_gallery(self, n_row=3, n_col=3):
         if not self.tested:
             raise ValueError("The test must be executed before plotting the image.")
 
         plt.figure(figsize=(1.8 * n_col, 2.4 * n_row))
         plt.subplots_adjust(bottom=0, left=0.01, right=0.99, top=0.90, hspace=0.35)
-        NUM_IMAGES_TO_DISPLAY = 12
+        NUM_IMAGES_TO_DISPLAY = 9
 
         white_separator = np.full(
             (self.test_output[0].test_img.shape[0], 10, 3), 255, dtype=np.uint8
@@ -129,10 +129,10 @@ class TestSuite:
             plt.imshow(
                 np.concatenate(
                     (
-                        test.test_img,
+                        test.test_img[:, :, ::-1],
                         white_separator,
                         (
-                            test.true_img
+                            test.true_img[:, :, ::-1]
                             if test.face_matched
                             else self.face_not_found(test.true_img, "ERRO")
                         ),
@@ -205,20 +205,21 @@ class TestSuite:
         self.true_labels: List[int | None] = []
         self.predicted_labels: List[int | None] = []
 
+        print("Start test...")
         for test in self.test_data:
-            label, confidence = self.recognizer.predict(
-                test_img=test.test_img, _confidence=55
-            )
+            label, confidence = self.recognizer.predict(test_img=test.test_img)
 
             label = label if label is not None else 0  # not recognized
 
             """DEBUG"""
             # if test.label != label:
             #     print(
-            #         f'expected label: {test.label}, predicted label: {label}, confidence: {confidence}, path: {test.path}')
+            #         f"Expected label: {test.label}, Predicted label: {label}, Confidence: {confidence}, Path: {test.path}"
+            #     )
 
             self.true_labels.append(test.label)
             self.predicted_labels.append(label)
+
             self.test_output.append(
                 TestOutput(
                     expected_value=test.label,
@@ -237,8 +238,8 @@ class TestSuite:
 if __name__ == "__main__":
     test_suite = TestSuite()
     test_result = test_suite.run_test(
-        test_data_path="dataset/AT&T Database of Faces/output/test-data",
-        training_data_path="dataset/AT&T Database of Faces/output/training-data",
+        test_data_path="dataset/FEI_Face_Database/output/test-data",
+        training_data_path="dataset/FEI_Face_Database/output/training-data",
     )
 
     test_suite.plot_gallery()
